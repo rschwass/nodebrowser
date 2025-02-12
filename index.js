@@ -6,8 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 let mainWindow;
 
 const os = require('os');
-const cookieFile = path.join(os.tmpdir(), `${uuidv4()}-cookies.json`);
-//const cookieFile = path.join('/tmp/', 'cookies.json');
+const cookieFile = path.join('/cookies/', `${uuidv4()}-cookies.json`);
+//const cookieFile = path.join('/cookies/', 'cookies.json');
 
 // Bypass SSL certificate errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
@@ -41,8 +41,7 @@ if (proxy) {
     }
   });
 
-  const args = process.argv.slice(1);  // Skip the first argument (AppImage path)
-  const url = args[0] || 'https://google.com';  // Default URL if none provided
+  const url = 'https://google.com';  // Default URL if none provided
 
   if (!url.startsWith('http')) {
     console.error(`Invalid URL: ${url}`);
@@ -85,3 +84,4 @@ if (proxy) {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+    
