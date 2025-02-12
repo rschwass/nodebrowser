@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 let mainWindow;
 const uuid = uuidv4();
-const storageFolder = path.join(__dirname, '/cookies', uuid);
+const storageFolder = path.join(__dirname, 'cookies', uuid);
 
 // Set custom userData path to /cookies/{UUID}
 app.setPath('userData', storageFolder);
@@ -53,7 +53,8 @@ app.on('ready', async () => {
     kiosk: true,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'), // Optional preload for further customization
     },
   });
 
