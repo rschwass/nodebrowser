@@ -41,6 +41,19 @@ const loadCookies = async (cookieFile, customSession) => {
 app.on('ready', async () => {
   const customSession = session.fromPartition('temporary-session');
 
+  const proxy = process.env.PROXY;
+
+  if (proxy) {
+    try {
+      await customsSession.setProxy({ proxyRules: proxy });
+      console.log(`Proxy set to: ${proxy}`);
+    } catch (error) {
+      console.error('Failed to set proxy:', error);
+    }
+  } else {
+    console.log('No proxy set. Proceeding without proxy.');
+  }
+
   const args = process.argv.slice(2);
   if (args.length < 2) {
     console.error('Invalid arguments. Usage: electron app.js <path-to-cookie-file> <url>');
