@@ -1,11 +1,19 @@
 const { app, BrowserWindow, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 let mainWindow;
 const storageFolder = path.join('/cookies/');
-const storageFile = (type) => path.join(storageFolder, `${type}.json`); // Fixed filenames: cookies.json, localStorage.json, sessionStorage.json
 
+// Ensure the storage folder exists
+if (!fs.existsSync(storageFolder)) {
+  fs.mkdirSync(storageFolder, { recursive: true });
+}
+
+// Generate a single UUID for this session
+const uuid = uuidv4();
+const storageFile = (type) => path.join(storageFolder, `${uuid}-${type}.json`); // uuid-cookies.json, uuid-localStorage.json, uuid-sessionStorage.json
 
 // Bypass SSL certificate errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
@@ -28,7 +36,7 @@ app.on('ready', async () => {
   }
 
   const args = process.argv.slice(2);
-  const url = args[1] || 'https://google.com'; // Default to Google if no URL provided
+  const url = args[0] || 'https://google.com'; // Default to Google if no URL provided
 
   if (!url.startsWith('http')) {
     console.error(`Invalid URL: ${url}`);
