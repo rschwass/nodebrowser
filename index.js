@@ -2,12 +2,10 @@ const { app, BrowserWindow, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const os = require('os');
 
 let mainWindow;
-
-const os = require('os');
 const cookieFile = path.join('/cookies/', `${uuidv4()}-cookies.json`);
-//const cookieFile = path.join('/cookies/', 'cookies.json');
 
 // Bypass SSL certificate errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
@@ -16,32 +14,23 @@ app.on('certificate-error', (event, webContents, url, error, certificate, callba
 });
 
 app.on('ready', async () => {
-// Check if the PROXY environment variable is set
-const proxy = process.env.PROXY;
+  // Check if the PROXY environment variable is set
+  const proxy = process.env.PROXY;
 
-if (proxy) {
-  try {
-    await session.defaultSession.setProxy({ proxyRules: proxy });
-    console.log(`Proxy set to: ${proxy}`);
-  } catch (error) {
-    console.error('Failed to set proxy:', error);
-  }
-} else {
-  console.log('No proxy set. Proceeding without proxy.');
-}
-
-  mainWindow = new BrowserWindow({
-    fullscreen: true,
-    kiosk: true,
-    webPreferences: {
-      //session: session.fromPartition('persist:temporary-session'),
-      contextIsolation: true,
-      //devTools: false,
-      nodeIntegration: false
+  if (proxy) {
+    try {
+      await session.defaultSession.setProxy({ proxyRules: proxy });
+      console.log(`Proxy set to: ${proxy}`);
+    } catch (error) {
+      console.error('Failed to set proxy:', error);
     }
-  });
+  } else {
+    console.log('No proxy set. Proceeding without proxy.');
+  }
 
-  const url = 'https://google.com';  // Default URL if none provided
+  // Get the URL from command-line arguments
+  const args = process.argv.slice(2);
+  const url = args[0] || 'https://google.com';  // Default to Google if no URL provided
 
   if (!url.startsWith('http')) {
     console.error(`Invalid URL: ${url}`);
@@ -49,9 +38,18 @@ if (proxy) {
     return;
   }
 
+  console.log(`Loading URL: ${url}`);
+
+  mainWindow = new BrowserWindow({
+    fullscreen: true,
+    kiosk: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
 
   mainWindow.loadURL(url);
-  //mainWindow.loadURL('https://github.com/login');
 
   // Function to save cookies to a file
   const saveCookies = async () => {
@@ -84,4 +82,3 @@ if (proxy) {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
-    
