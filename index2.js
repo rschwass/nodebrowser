@@ -45,7 +45,7 @@ app.on('ready', async () => {
   const urlToLoad = args[1];
 
   // Set userData path to a custom directory based on uuid
-  const userDataPath = path.join(__dirname, '/cookies', uuid);
+  const userDataPath = path.join('/tmp/cookies', uuid);
   app.setPath('userData', userDataPath);
   console.log(`User data path set to: ${userDataPath}`);
 
