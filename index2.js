@@ -4,10 +4,10 @@ const path = require('path');
 
 let mainWindow;
 
-// Helper function to wait for a specified time (for retries)
+// Helper function to wait (for retries)
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Function to load cookies into the specified session with retries and logging
+// Function to load cookies into the session
 const loadCookies = async (cookieFile, customSession) => {
   if (!fs.existsSync(cookieFile)) {
     console.error(`Cookie file not found at ${cookieFile}`);
@@ -26,19 +26,20 @@ const loadCookies = async (cookieFile, customSession) => {
         path: cookie.path || '/',
         secure: cookie.secure,
         httpOnly: cookie.httpOnly,
-        expirationDate: cookie.expirationDate
+        expirationDate: cookie.expirationDate,
+        sameSite: 'no_restriction' // Force SameSite to be no_restriction
       };
 
-      let retries = 3; // Retry setting each cookie up to 3 times if it fails
+      let retries = 3;
       while (retries > 0) {
         try {
           await customSession.cookies.set(cookieDetails);
           console.log(`Loaded cookie: ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
-          break; // Exit retry loop on success
+          break;
         } catch (error) {
           retries--;
           console.warn(`Failed to set cookie ${cookie.name}. Retries left: ${retries}. Error: ${error.message}`);
-          await wait(500); // Wait 500ms before retrying
+          await wait(500);
         }
       }
     }
