@@ -4,7 +4,6 @@ const path = require('path');
 
 let mainWindow;
 
-// Function to load cookies into the specified session
 const loadCookies = async (cookieFile, customSession) => {
   if (!fs.existsSync(cookieFile)) {
     console.log(`Cookie file not found at ${cookieFile}`);
@@ -14,30 +13,17 @@ const loadCookies = async (cookieFile, customSession) => {
   try {
     const cookies = JSON.parse(fs.readFileSync(cookieFile));
     for (const cookie of cookies) {
-      let retries = 3;
-
-      while (retries > 0) {
-        try {
-          const cookieDetails = {
-            url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
-            name: cookie.name,
-            value: cookie.value,
-            path: cookie.path || '/',
-            secure: cookie.secure || cookie.sameSite === 'None',
-            httpOnly: cookie.httpOnly,
-            expirationDate: cookie.expirationDate,
-            sameSite: cookie.sameSite || 'no_restriction'
-          };
-
-          await customSession.cookies.set(cookieDetails);
-          console.log(`Loaded cookie: ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
-          break;
-        } catch (error) {
-          retries--;
-          console.error(`Failed to set cookie ${cookie.name}. Retries left: ${retries}. Error: ${error.message}`);
-          if (retries === 0) console.warn(`Skipped cookie ${cookie.name} after multiple attempts.`);
-        }
-      }
+      const cookieDetails = {
+        url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+        name: cookie.name,
+        value: cookie.value,
+        path: cookie.path || '/',
+        secure: cookie.secure || cookie.sameSite === 'None',
+        httpOnly: cookie.httpOnly,
+        expirationDate: cookie.expirationDate,
+        sameSite: cookie.sameSite || 'no_restriction',
+      };
+      await customSession.cookies.set(cookieDetails);
     }
     console.log('All cookies loaded.');
   } catch (error) {
@@ -45,8 +31,7 @@ const loadCookies = async (cookieFile, customSession) => {
   }
 };
 
-// Function to load localStorage or sessionStorage
-const loadStorage = async (storageFile, storageType, customSession) => {
+const loadStorage = async (storageFile, storageType) => {
   if (!fs.existsSync(storageFile)) {
     console.log(`${storageType} file not found at ${storageFile}`);
     return;
@@ -62,15 +47,10 @@ const loadStorage = async (storageFile, storageType, customSession) => {
         console.log('${storageType} injected');
       })();
     `;
-
-    customSession.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
-      callback({ cancel: false });
-      mainWindow.webContents.executeJavaScript(preloadScript)
-        .then(() => console.log(`${storageType} loaded.`))
-        .catch(error => console.error(`Failed to inject ${storageType}:`, error));
-    });
+    return preloadScript;
   } catch (error) {
     console.error(`Failed to load ${storageType}:`, error);
+    return '';
   }
 };
 
@@ -94,18 +74,30 @@ app.on('ready', async () => {
   console.log(`Loading localStorage from: ${localStorageFile}`);
   console.log(`Loading sessionStorage from: ${sessionStorageFile}`);
 
-  // Load cookies, localStorage, and sessionStorage before creating the window
+  // Load cookies and storage before creating the window
   await loadCookies(cookieFile, customSession);
-  await loadStorage(localStorageFile, 'localStorage', customSession);
-  await loadStorage(sessionStorageFile, 'sessionStorage', customSession);
+
+  const localStorageScript = await loadStorage(localStorageFile, 'localStorage');
+  const sessionStorageScript = await loadStorage(sessionStorageFile, 'sessionStorage');
 
   mainWindow = new BrowserWindow({
     webPreferences: {
       session: customSession,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
       devTools: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, async (details, callback) => {
+    if (details.url === urlToLoad) {
+      console.log('Injecting storage data...');
+      await mainWindow.webContents.executeJavaScript(localStorageScript);
+      await mainWindow.webContents.executeJavaScript(sessionStorageScript);
+      console.log('Storage data injected. Proceeding with navigation.');
     }
+    callback({ cancel: false });
   });
 
   console.log(`Navigating to: ${urlToLoad}`);
