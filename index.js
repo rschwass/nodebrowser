@@ -6,10 +6,6 @@ let mainWindow;
 const storageFolder = path.join('/cookies/');
 const storageFile = (type) => path.join(storageFolder, `${type}.json`); // Fixed filenames: cookies.json, localStorage.json, sessionStorage.json
 
-// Ensure the storage folder exists
-if (!fs.existsSync(storageFolder)) {
-  fs.mkdirSync(storageFolder, { recursive: true });
-}
 
 // Bypass SSL certificate errors
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
