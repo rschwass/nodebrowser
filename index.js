@@ -4,17 +4,24 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 let mainWindow;
-const storageFolder = path.join('/cookies/');
-
-// Generate a single UUID for this session
 const uuid = uuidv4();
-const storageFile = (type) => path.join(storageFolder, `${uuid}-${type}.json`); // uuid-cookies.json, uuid-localStorage.json, uuid-sessionStorage.json
+const storageFolder = path.join(__dirname, 'cookies', uuid);
 
-// Bypass SSL certificate errors
-app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
-  event.preventDefault();
-  callback(true);
-});
+// Set custom userData path to /cookies/{UUID}
+app.setPath('userData', storageFolder);
+console.log(`Electron storage path set to: ${app.getPath('userData')}`);
+
+// Function to save cookies to a file
+const saveCookies = async () => {
+  try {
+    const cookies = await session.defaultSession.cookies.get({});
+    const cookieFile = path.join(storageFolder, 'cookies.json');
+    fs.writeFileSync(cookieFile, JSON.stringify(cookies, null, 2));
+    console.log(`Saved ${cookies.length} cookies to ${cookieFile}`);
+  } catch (error) {
+    console.error('Failed to save cookies:', error);
+  }
+};
 
 app.on('ready', async () => {
   const proxy = process.env.PROXY;
@@ -47,49 +54,13 @@ app.on('ready', async () => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, 'preload.js') // Preload script for injecting storage listener
-    }
+      preload: path.join(__dirname, 'preload.js'), // Optional preload for further customization
+    },
   });
 
   mainWindow.loadURL(url);
 
-  // Function to save cookies
-  const saveCookies = async () => {
-    try {
-      const cookies = await session.defaultSession.cookies.get({});
-      const cookieFile = storageFile('cookies');
-      fs.writeFileSync(cookieFile, JSON.stringify(cookies, null, 2));
-      console.log(`Saved ${cookies.length} cookies to ${cookieFile}`);
-    } catch (error) {
-      console.error('Failed to save cookies:', error);
-    }
-  };
-
-  // Function to save localStorage and sessionStorage
-  const saveStorage = async (localStorageData, sessionStorageData) => {
-    try {
-      // Save localStorage
-      const localFile = storageFile('localStorage');
-      fs.writeFileSync(localFile, localStorageData);
-      console.log(`Saved localStorage to ${localFile}`);
-
-      // Save sessionStorage
-      const sessionFile = storageFile('sessionStorage');
-      fs.writeFileSync(sessionFile, sessionStorageData);
-      console.log(`Saved sessionStorage to ${sessionFile}`);
-    } catch (error) {
-      console.error('Failed to save storage data:', error);
-    }
-  };
-
-  // Handle storage updates from the renderer process
-  const { ipcMain } = require('electron');
-  ipcMain.on('storage-updated', (event, localStorageData, sessionStorageData) => {
-    console.log('Storage change detected. Saving storage...');
-    saveStorage(localStorageData, sessionStorageData);
-  });
-
-  // Save cookies when they change
+  // Save cookies whenever they change
   session.defaultSession.cookies.on('changed', async () => {
     console.log('Cookie change detected. Saving cookies...');
     await saveCookies();
