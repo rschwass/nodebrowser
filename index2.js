@@ -38,19 +38,21 @@ const loadCookies = async (cookieFile, customSession) => {
   }
 };
 
-
 app.on('ready', async () => {
   const customSession = session.fromPartition('temporary-session');
 
   const args = process.argv.slice(2);
-  if (args.length === 0) {
-    console.error('No cookie file specified. Usage: electron app.js <path-to-cookie-file>');
+  if (args.length < 2) {
+    console.error('Invalid arguments. Usage: electron app.js <path-to-cookie-file> <url>');
     app.quit();
     return;
   }
 
   const cookieFile = path.resolve(args[0]);
+  const urlToLoad = args[1]; // Second argument as the URL
+
   console.log(`Loading cookies from: ${cookieFile}`);
+  console.log(`Navigating to: ${urlToLoad}`);
 
   await loadCookies(cookieFile, customSession);  // Ensure cookies are loaded before navigating
 
@@ -63,7 +65,7 @@ app.on('ready', async () => {
     }
   });
 
-  mainWindow.loadURL('https://github.com');  // Load the URL after all cookies are set
+  mainWindow.loadURL(urlToLoad);  // Load the specified URL
 });
 
 app.on('window-all-closed', () => {
