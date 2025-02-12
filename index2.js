@@ -45,8 +45,8 @@ const loadCookies = async (cookieFile, customSession) => {
   }
 };
 
-// Function to load localStorage and sessionStorage
-const loadStorage = async (storageFile, storageType, customSession) => {
+// Function to load localStorage or sessionStorage
+const loadStorage = async (storageFile, storageType) => {
   if (!fs.existsSync(storageFile)) {
     console.log(`${storageType} file not found at ${storageFile}`);
     return;
@@ -54,37 +54,33 @@ const loadStorage = async (storageFile, storageType, customSession) => {
 
   try {
     const storageData = JSON.parse(fs.readFileSync(storageFile));
-    customSession.webRequest.onCompleted(({ url }) => {
-      const script = `
-        (function() {
-          const storage = ${storageType === 'localStorage' ? 'window.localStorage' : 'window.sessionStorage'};
-          const data = ${JSON.stringify(storageData)};
-          Object.keys(data).forEach(key => storage.setItem(key, data[key]));
-        })();
-      `;
-  
-      customSession.webContents.executeJavaScript(script)
-        .then(() => console.log(`${storageType} loaded for ${url}`))
-        .catch((error) => console.error(`Failed to execute JavaScript for ${storageType}:`, error));
-    });
+    const script = `
+      (function() {
+        const storage = ${storageType === 'localStorage' ? 'window.localStorage' : 'window.sessionStorage'};
+        const data = ${JSON.stringify(storageData)};
+        Object.keys(data).forEach(key => storage.setItem(key, data[key]));
+      })();
+    `;
+
+    await mainWindow.webContents.executeJavaScript(script);
+    console.log(`${storageType} loaded.`);
   } catch (error) {
     console.error(`Failed to load ${storageType}:`, error);
   }
-  
 };
 
 app.on('ready', async () => {
   const customSession = session.fromPartition('temporary-session');
 
   const args = process.argv.slice(2);
-  if (args.length < 1) {
+  if (args.length < 2) {
     console.error('Invalid arguments. Usage: electron app.js <uuid> <url>');
     app.quit();
     return;
   }
 
   const uuid = args[0];
-  const urlToLoad = args[1] || 'https://google.com';
+  const urlToLoad = args[1];
   const cookieFile = path.join('/cookies/', `${uuid}-cookies.json`);
   const localStorageFile = path.join('/cookies/', `${uuid}-localStorage.json`);
   const sessionStorageFile = path.join('/cookies/', `${uuid}-sessionStorage.json`);
@@ -95,8 +91,6 @@ app.on('ready', async () => {
   console.log(`Navigating to: ${urlToLoad}`);
 
   await loadCookies(cookieFile, customSession);
-  await loadStorage(localStorageFile, 'localStorage', customSession);
-  await loadStorage(sessionStorageFile, 'sessionStorage', customSession);
 
   mainWindow = new BrowserWindow({
     webPreferences: {
@@ -108,6 +102,12 @@ app.on('ready', async () => {
   });
 
   mainWindow.loadURL(urlToLoad);
+
+  mainWindow.webContents.once('did-finish-load', async () => {
+    console.log('Page loaded. Loading storage data...');
+    await loadStorage(localStorageFile, 'localStorage');
+    await loadStorage(sessionStorageFile, 'sessionStorage');
+  });
 });
 
 app.on('window-all-closed', () => {
