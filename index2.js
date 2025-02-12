@@ -4,46 +4,43 @@ const path = require('path');
 
 let mainWindow;
 
-// Helper function to wait (for retries)
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Function to load cookies into the session
+// Function to load cookies into the specified session
 const loadCookies = async (cookieFile, customSession) => {
   if (!fs.existsSync(cookieFile)) {
-    console.error(`Cookie file not found at ${cookieFile}`);
+    console.log(`Cookie file not found at ${cookieFile}`);
     return;
   }
 
   try {
     const cookies = JSON.parse(fs.readFileSync(cookieFile));
-    console.log(`Found ${cookies.length} cookies to load.`);
-
     for (const cookie of cookies) {
-      const cookieDetails = {
-        url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
-        name: cookie.name,
-        value: cookie.value,
-        path: cookie.path || '/',
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        expirationDate: cookie.expirationDate,
-        sameSite: 'no_restriction' // Force SameSite to be no_restriction
-      };
-
       let retries = 3;
+
       while (retries > 0) {
         try {
+          const cookieDetails = {
+            url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+            name: cookie.name,
+            value: cookie.value,
+            path: cookie.path || '/',
+            secure: cookie.secure || cookie.sameSite === 'None', // Enforce secure if SameSite=None
+            httpOnly: cookie.httpOnly,
+            expirationDate: cookie.expirationDate,
+            sameSite: cookie.sameSite || 'no_restriction' // Allow SameSite=None cookies
+          };
+
           await customSession.cookies.set(cookieDetails);
           console.log(`Loaded cookie: ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
-          break;
+          break; // Exit retry loop if successful
         } catch (error) {
           retries--;
-          console.warn(`Failed to set cookie ${cookie.name}. Retries left: ${retries}. Error: ${error.message}`);
-          await wait(500);
+          console.error(`Failed to set cookie ${cookie.name}. Retries left: ${retries}. Error: ${error.message}`);
+          if (retries === 0) {
+            console.warn(`Skipped cookie ${cookie.name} after multiple attempts.`);
+          }
         }
       }
     }
-
     console.log('All cookies loaded.');
   } catch (error) {
     console.error('Failed to load cookies:', error);
@@ -52,6 +49,7 @@ const loadCookies = async (cookieFile, customSession) => {
 
 app.on('ready', async () => {
   const customSession = session.fromPartition('temporary-session');
+
   const proxy = process.env.PROXY;
 
   if (proxy) {
@@ -78,7 +76,7 @@ app.on('ready', async () => {
   console.log(`Loading cookies from: ${cookieFile}`);
   console.log(`Navigating to: ${urlToLoad}`);
 
-  await loadCookies(cookieFile, customSession);
+  await loadCookies(cookieFile, customSession); // Ensure cookies are loaded before navigating
 
   mainWindow = new BrowserWindow({
     webPreferences: {
@@ -87,14 +85,6 @@ app.on('ready', async () => {
       devTools: true,
       nodeIntegration: false
     }
-  });
-
-  mainWindow.webContents.once('did-finish-load', async () => {
-    const loadedCookies = await customSession.cookies.get({});
-    console.log(`Currently loaded cookies (${loadedCookies.length}):`);
-    loadedCookies.forEach((cookie) => {
-      console.log(`- ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
-    });
   });
 
   mainWindow.loadURL(urlToLoad);
