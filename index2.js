@@ -45,7 +45,7 @@ app.on('ready', async () => {
 
   if (proxy) {
     try {
-      await customsSession.setProxy({ proxyRules: proxy });
+      await customSession.setProxy({ proxyRules: proxy });
       console.log(`Proxy set to: ${proxy}`);
     } catch (error) {
       console.error('Failed to set proxy:', error);
