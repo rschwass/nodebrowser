@@ -6,7 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 let mainWindow;
 const storageFolder = path.join('/cookies/');
 
-
 // Generate a single UUID for this session
 const uuid = uuidv4();
 const storageFile = (type) => path.join(storageFolder, `${uuid}-${type}.json`); // uuid-cookies.json, uuid-localStorage.json, uuid-sessionStorage.json
@@ -48,7 +47,8 @@ app.on('ready', async () => {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-    },
+      preload: path.join(__dirname, 'preload.js') // Preload script for injecting storage listener
+    }
   });
 
   mainWindow.loadURL(url);
@@ -66,40 +66,37 @@ app.on('ready', async () => {
   };
 
   // Function to save localStorage and sessionStorage
-  const saveStorage = async () => {
+  const saveStorage = async (localStorageData, sessionStorageData) => {
     try {
-      const storageData = await mainWindow.webContents.executeJavaScript(`
-        (function() {
-          return {
-            localStorage: JSON.stringify(localStorage),
-            sessionStorage: JSON.stringify(sessionStorage)
-          };
-        })();
-      `);
-
       // Save localStorage
       const localFile = storageFile('localStorage');
-      fs.writeFileSync(localFile, storageData.localStorage);
+      fs.writeFileSync(localFile, localStorageData);
       console.log(`Saved localStorage to ${localFile}`);
 
       // Save sessionStorage
       const sessionFile = storageFile('sessionStorage');
-      fs.writeFileSync(sessionFile, storageData.sessionStorage);
+      fs.writeFileSync(sessionFile, sessionStorageData);
       console.log(`Saved sessionStorage to ${sessionFile}`);
     } catch (error) {
       console.error('Failed to save storage data:', error);
     }
   };
 
-  // Save cookies, localStorage, and sessionStorage after the page loads
-  mainWindow.webContents.once('did-finish-load', async () => {
-    console.log('Page loaded. Capturing data...');
-    await saveCookies();
-    await saveStorage();
+  // Handle storage updates from the renderer process
+  const { ipcMain } = require('electron');
+  ipcMain.on('storage-updated', (event, localStorageData, sessionStorageData) => {
+    console.log('Storage change detected. Saving storage...');
+    saveStorage(localStorageData, sessionStorageData);
   });
 
+  // Save cookies when they change
   session.defaultSession.cookies.on('changed', async () => {
     console.log('Cookie change detected. Saving cookies...');
+    await saveCookies();
+  });
+
+  mainWindow.webContents.once('did-finish-load', async () => {
+    console.log('Page loaded. Initial data capture...');
     await saveCookies();
   });
 });

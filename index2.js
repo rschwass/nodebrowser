@@ -46,7 +46,7 @@ const loadCookies = async (cookieFile, customSession) => {
 };
 
 // Function to load localStorage or sessionStorage
-const loadStorage = async (storageFile, storageType) => {
+const loadStorage = async (storageFile, storageType, customSession) => {
   if (!fs.existsSync(storageFile)) {
     console.log(`${storageType} file not found at ${storageFile}`);
     return;
@@ -54,16 +54,21 @@ const loadStorage = async (storageFile, storageType) => {
 
   try {
     const storageData = JSON.parse(fs.readFileSync(storageFile));
-    const script = `
+    const preloadScript = `
       (function() {
         const storage = ${storageType === 'localStorage' ? 'window.localStorage' : 'window.sessionStorage'};
         const data = ${JSON.stringify(storageData)};
         Object.keys(data).forEach(key => storage.setItem(key, data[key]));
+        console.log('${storageType} injected');
       })();
     `;
 
-    await mainWindow.webContents.executeJavaScript(script);
-    console.log(`${storageType} loaded.`);
+    customSession.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
+      callback({ cancel: false });
+      mainWindow.webContents.executeJavaScript(preloadScript)
+        .then(() => console.log(`${storageType} loaded.`))
+        .catch(error => console.error(`Failed to inject ${storageType}:`, error));
+    });
   } catch (error) {
     console.error(`Failed to load ${storageType}:`, error);
   }
@@ -88,9 +93,11 @@ app.on('ready', async () => {
   console.log(`Loading cookies from: ${cookieFile}`);
   console.log(`Loading localStorage from: ${localStorageFile}`);
   console.log(`Loading sessionStorage from: ${sessionStorageFile}`);
-  console.log(`Navigating to: ${urlToLoad}`);
 
+  // Load cookies, localStorage, and sessionStorage before creating the window
   await loadCookies(cookieFile, customSession);
+  await loadStorage(localStorageFile, 'localStorage', customSession);
+  await loadStorage(sessionStorageFile, 'sessionStorage', customSession);
 
   mainWindow = new BrowserWindow({
     webPreferences: {
@@ -101,13 +108,8 @@ app.on('ready', async () => {
     }
   });
 
+  console.log(`Navigating to: ${urlToLoad}`);
   mainWindow.loadURL(urlToLoad);
-
-  mainWindow.webContents.once('did-finish-load', async () => {
-    console.log('Page loaded. Loading storage data...');
-    await loadStorage(localStorageFile, 'localStorage');
-    await loadStorage(sessionStorageFile, 'sessionStorage');
-  });
 });
 
 app.on('window-all-closed', () => {
