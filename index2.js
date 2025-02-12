@@ -13,9 +13,11 @@ const loadCookies = async (cookieFile, customSession) => {
 
   try {
     const cookies = JSON.parse(fs.readFileSync(cookieFile));
+    console.log(`Found ${cookies.length} cookies to load.`);
+
     for (const cookie of cookies) {
       const cookieDetails = {
-        url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.startsWith('.') ? cookie.domain.substring(1) : cookie.domain}${cookie.path}`,
+        url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
         name: cookie.name,
         value: cookie.value,
         path: cookie.path,
@@ -31,6 +33,7 @@ const loadCookies = async (cookieFile, customSession) => {
         console.error(`Failed to set cookie ${cookie.name}:`, error);
       }
     }
+
     console.log('All cookies loaded.');
   } catch (error) {
     console.error('Failed to load cookies:', error);
@@ -60,12 +63,12 @@ app.on('ready', async () => {
   }
 
   const cookieFile = path.resolve(args[0]);
-  const urlToLoad = args[1]; // Second argument as the URL
+  const urlToLoad = args[1];
 
   console.log(`Loading cookies from: ${cookieFile}`);
   console.log(`Navigating to: ${urlToLoad}`);
 
-  await loadCookies(cookieFile, customSession);  // Ensure cookies are loaded before navigating
+  await loadCookies(cookieFile, customSession);
 
   mainWindow = new BrowserWindow({
     webPreferences: {
@@ -76,7 +79,13 @@ app.on('ready', async () => {
     }
   });
 
-  mainWindow.loadURL(urlToLoad);  // Load the specified URL
+  // Ensure all cookies are loaded before navigating to the URL
+  mainWindow.webContents.once('did-finish-load', async () => {
+    const loadedCookies = await customSession.cookies.get({});
+    console.log(`Currently loaded cookies (${loadedCookies.length}):`, loadedCookies);
+  });
+
+  mainWindow.loadURL(urlToLoad);
 });
 
 app.on('window-all-closed', () => {
