@@ -54,7 +54,7 @@ const loadStorage = async (storageFile, storageType, customSession) => {
 
   try {
     const storageData = JSON.parse(fs.readFileSync(storageFile));
-    await customSession.webRequest.onCompleted(async ({ url }) => {
+    customSession.webRequest.onCompleted(({ url }) => {
       const script = `
         (function() {
           const storage = ${storageType === 'localStorage' ? 'window.localStorage' : 'window.sessionStorage'};
@@ -62,12 +62,15 @@ const loadStorage = async (storageFile, storageType, customSession) => {
           Object.keys(data).forEach(key => storage.setItem(key, data[key]));
         })();
       `;
-      customSession.webContents.executeJavaScript(script);
-      console.log(`${storageType} loaded for ${url}`);
+  
+      customSession.webContents.executeJavaScript(script)
+        .then(() => console.log(`${storageType} loaded for ${url}`))
+        .catch((error) => console.error(`Failed to execute JavaScript for ${storageType}:`, error));
     });
   } catch (error) {
     console.error(`Failed to load ${storageType}:`, error);
   }
+  
 };
 
 app.on('ready', async () => {
