@@ -1,12 +1,10 @@
 const { app, BrowserWindow, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const os = require('os');
 
 let mainWindow;
 const storageFolder = path.join('/cookies/');
-const storageFile = (type) => path.join(storageFolder, `${uuidv4()}-${type}.json`);
+const storageFile = (type) => path.join(storageFolder, `${type}.json`); // Fixed filenames: cookies.json, localStorage.json, sessionStorage.json
 
 // Ensure the storage folder exists
 if (!fs.existsSync(storageFolder)) {
@@ -34,7 +32,7 @@ app.on('ready', async () => {
   }
 
   const args = process.argv.slice(2);
-  const url = args[1] || 'https://google.com';
+  const url = args[0] || 'https://google.com'; // Default to Google if no URL provided
 
   if (!url.startsWith('http')) {
     console.error(`Invalid URL: ${url}`);
@@ -59,13 +57,9 @@ app.on('ready', async () => {
   const saveCookies = async () => {
     try {
       const cookies = await session.defaultSession.cookies.get({});
-      if (cookies.length > 0) {
-        const cookieFile = storageFile('cookies');
-        fs.writeFileSync(cookieFile, JSON.stringify(cookies, null, 2));
-        console.log(`Saved ${cookies.length} cookies to ${cookieFile}`);
-      } else {
-        console.log('No cookies found.');
-      }
+      const cookieFile = storageFile('cookies');
+      fs.writeFileSync(cookieFile, JSON.stringify(cookies, null, 2));
+      console.log(`Saved ${cookies.length} cookies to ${cookieFile}`);
     } catch (error) {
       console.error('Failed to save cookies:', error);
     }
@@ -104,8 +98,8 @@ app.on('ready', async () => {
     await saveStorage();
   });
 
-  session.defaultSession.cookies.on('changed', async (event, cookie, cause, removed) => {
-    console.log(`Cookie changed: ${cookie.name} (cause: ${cause}, removed: ${removed})`);
+  session.defaultSession.cookies.on('changed', async () => {
+    console.log('Cookie change detected. Saving cookies...');
     await saveCookies();
   });
 });
