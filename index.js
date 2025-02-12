@@ -6,10 +6,6 @@ const { v4: uuidv4 } = require('uuid');
 let mainWindow;
 const storageFolder = path.join('/cookies/');
 
-// Ensure the storage folder exists
-if (!fs.existsSync(storageFolder)) {
-  fs.mkdirSync(storageFolder, { recursive: true });
-}
 
 // Generate a single UUID for this session
 const uuid = uuidv4();
