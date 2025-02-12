@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "electron index.js",
+    "start": "electron index.js --no-sandbox",
     "loader": "electron index2.js",
     "build": "electron-builder --linux AppImage",
     "test": "echo \"Error: no test specified\" && exit 1"
