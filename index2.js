@@ -4,10 +4,13 @@ const path = require('path');
 
 let mainWindow;
 
-// Function to load cookies into the specified session
+// Helper function to wait for a specified time (for retries)
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Function to load cookies into the specified session with retries and logging
 const loadCookies = async (cookieFile, customSession) => {
   if (!fs.existsSync(cookieFile)) {
-    console.log(`Cookie file not found at ${cookieFile}`);
+    console.error(`Cookie file not found at ${cookieFile}`);
     return;
   }
 
@@ -20,17 +23,23 @@ const loadCookies = async (cookieFile, customSession) => {
         url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
         name: cookie.name,
         value: cookie.value,
-        path: cookie.path,
+        path: cookie.path || '/',
         secure: cookie.secure,
         httpOnly: cookie.httpOnly,
         expirationDate: cookie.expirationDate
       };
 
-      try {
-        await customSession.cookies.set(cookieDetails);
-        console.log(`Loaded cookie: ${cookie.name}`);
-      } catch (error) {
-        console.error(`Failed to set cookie ${cookie.name}:`, error);
+      let retries = 3; // Retry setting each cookie up to 3 times if it fails
+      while (retries > 0) {
+        try {
+          await customSession.cookies.set(cookieDetails);
+          console.log(`Loaded cookie: ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
+          break; // Exit retry loop on success
+        } catch (error) {
+          retries--;
+          console.warn(`Failed to set cookie ${cookie.name}. Retries left: ${retries}. Error: ${error.message}`);
+          await wait(500); // Wait 500ms before retrying
+        }
       }
     }
 
@@ -79,10 +88,12 @@ app.on('ready', async () => {
     }
   });
 
-  // Ensure all cookies are loaded before navigating to the URL
   mainWindow.webContents.once('did-finish-load', async () => {
     const loadedCookies = await customSession.cookies.get({});
-    console.log(`Currently loaded cookies (${loadedCookies.length}):`, loadedCookies);
+    console.log(`Currently loaded cookies (${loadedCookies.length}):`);
+    loadedCookies.forEach((cookie) => {
+      console.log(`- ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
+    });
   });
 
   mainWindow.loadURL(urlToLoad);
