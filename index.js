@@ -28,7 +28,7 @@ app.on('ready', async () => {
   }
 
   const args = process.argv.slice(2);
-  const url = args[0] || 'https://google.com'; // Default to Google if no URL provided
+  const url = args[1] || 'https://google.com'; // Default to Google if no URL provided
 
   if (!url.startsWith('http')) {
     console.error(`Invalid URL: ${url}`);
