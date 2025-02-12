@@ -53,8 +53,7 @@ app.on('ready', async () => {
     kiosk: true,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false,
-      preload: path.join(__dirname, 'preload.js'), // Optional preload for further customization
+      nodeIntegration: false
     },
   });
 
