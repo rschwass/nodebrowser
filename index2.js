@@ -4,6 +4,7 @@ const path = require('path');
 
 let mainWindow;
 
+// Function to load cookies into the specified session
 const loadCookies = async (cookieFile, customSession) => {
   if (!fs.existsSync(cookieFile)) {
     console.log(`Cookie file not found at ${cookieFile}`);
@@ -24,6 +25,7 @@ const loadCookies = async (cookieFile, customSession) => {
         sameSite: cookie.sameSite || 'no_restriction',
       };
       await customSession.cookies.set(cookieDetails);
+      console.log(`Loaded cookie: ${cookie.name} (Domain: ${cookie.domain}, Path: ${cookie.path})`);
     }
     console.log('All cookies loaded.');
   } catch (error) {
@@ -31,32 +33,7 @@ const loadCookies = async (cookieFile, customSession) => {
   }
 };
 
-const loadStorage = async (storageFile, storageType) => {
-  if (!fs.existsSync(storageFile)) {
-    console.log(`${storageType} file not found at ${storageFile}`);
-    return;
-  }
-
-  try {
-    const storageData = JSON.parse(fs.readFileSync(storageFile));
-    const preloadScript = `
-      (function() {
-        const storage = ${storageType === 'localStorage' ? 'window.localStorage' : 'window.sessionStorage'};
-        const data = ${JSON.stringify(storageData)};
-        Object.keys(data).forEach(key => storage.setItem(key, data[key]));
-        console.log('${storageType} injected');
-      })();
-    `;
-    return preloadScript;
-  } catch (error) {
-    console.error(`Failed to load ${storageType}:`, error);
-    return '';
-  }
-};
-
 app.on('ready', async () => {
-  const customSession = session.fromPartition('temporary-session');
-
   const args = process.argv.slice(2);
   if (args.length < 2) {
     console.error('Invalid arguments. Usage: electron app.js <uuid> <url>');
@@ -66,38 +43,25 @@ app.on('ready', async () => {
 
   const uuid = args[0];
   const urlToLoad = args[1];
-  const cookieFile = path.join('/cookies/', `${uuid}-cookies.json`);
-  const localStorageFile = path.join('/cookies/', `${uuid}-localStorage.json`);
-  const sessionStorageFile = path.join('/cookies/', `${uuid}-sessionStorage.json`);
 
+  // Set userData path to a custom directory based on uuid
+  const userDataPath = path.join(__dirname, 'cookies', uuid);
+  app.setPath('userData', userDataPath);
+  console.log(`User data path set to: ${userDataPath}`);
+
+  // Load cookies manually from the file
+  const cookieFile = path.join(userDataPath, 'cookies.json');
+  const customSession = session.defaultSession;
   console.log(`Loading cookies from: ${cookieFile}`);
-  console.log(`Loading localStorage from: ${localStorageFile}`);
-  console.log(`Loading sessionStorage from: ${sessionStorageFile}`);
-
-  // Load cookies and storage before creating the window
   await loadCookies(cookieFile, customSession);
-
-  const localStorageScript = await loadStorage(localStorageFile, 'localStorage');
-  const sessionStorageScript = await loadStorage(sessionStorageFile, 'sessionStorage');
 
   mainWindow = new BrowserWindow({
     webPreferences: {
-      session: customSession,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      session: customSession,
       devTools: true,
       nodeIntegration: false,
     },
-  });
-
-  mainWindow.webContents.session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, async (details, callback) => {
-    if (details.url === urlToLoad) {
-      console.log('Injecting storage data...');
-      await mainWindow.webContents.executeJavaScript(localStorageScript);
-      await mainWindow.webContents.executeJavaScript(sessionStorageScript);
-      console.log('Storage data injected. Proceeding with navigation.');
-    }
-    callback({ cancel: false });
   });
 
   console.log(`Navigating to: ${urlToLoad}`);

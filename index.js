@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 let mainWindow;
 const uuid = uuidv4();
-const storageFolder = path.join(__dirname, 'cookies', uuid);
+const storageFolder = path.join(__dirname, '/cookies', uuid);
 
 // Set custom userData path to /cookies/{UUID}
 app.setPath('userData', storageFolder);
