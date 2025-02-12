@@ -14,13 +14,8 @@ const loadCookies = async (cookieFile, customSession) => {
   try {
     const cookies = JSON.parse(fs.readFileSync(cookieFile));
     for (const cookie of cookies) {
-      if (cookie.name.startsWith('__Host-') || cookie.name.startsWith('__Secure-')) {
-        console.warn(`Skipping invalid cookie: ${cookie.name}`);
-        continue;
-      }
-
       const cookieDetails = {
-        url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+        url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.startsWith('.') ? cookie.domain.substring(1) : cookie.domain}${cookie.path}`,
         name: cookie.name,
         value: cookie.value,
         path: cookie.path,
@@ -29,8 +24,12 @@ const loadCookies = async (cookieFile, customSession) => {
         expirationDate: cookie.expirationDate
       };
 
-      await customSession.cookies.set(cookieDetails);
-      console.log(`Loaded cookie: ${cookie.name}`);
+      try {
+        await customSession.cookies.set(cookieDetails);
+        console.log(`Loaded cookie: ${cookie.name}`);
+      } catch (error) {
+        console.error(`Failed to set cookie ${cookie.name}:`, error);
+      }
     }
     console.log('All cookies loaded.');
   } catch (error) {
@@ -40,7 +39,6 @@ const loadCookies = async (cookieFile, customSession) => {
 
 app.on('ready', async () => {
   const customSession = session.fromPartition('temporary-session');
-
   const proxy = process.env.PROXY;
 
   if (proxy) {
